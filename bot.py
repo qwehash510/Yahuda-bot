@@ -8,10 +8,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("FAST-RAID-KARS-2026")
+logger = logging.getLogger("WESTEROS-RAID-KARS-2026")
 
 app = Client(
-    "fast_raid_bot",
+    name=":memory:",
     bot_token=os.getenv("BOT_TOKEN")
 )
 
