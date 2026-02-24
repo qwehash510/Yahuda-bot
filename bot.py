@@ -12,8 +12,12 @@ logger = logging.getLogger("WESTEROS-RAID-KARS-2026")
 
 app = Client(
     name=":memory:",
+    api_id=int(os.getenv("API_ID")),
+    api_hash=os.getenv("API_HASH"),
     bot_token=os.getenv("BOT_TOKEN")
 )
+
+
 
 OWNER_ID = int(os.getenv("OWNER_ID"))
 RAID_ACTIVE = {}  # chat_id bazlı raid durumu
