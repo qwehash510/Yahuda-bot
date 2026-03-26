@@ -1,201 +1,135 @@
-import os
+import logging
 import asyncio
-from pyrogram import Client, filters
-from pyrogram.types import Message
-from pyrogram.idle import idle
-from pytgcalls import PyTgCalls
-from pytgcalls.types.input_stream import AudioPiped
-import yt_dlp
+import time
+from telethon import TelegramClient, events
+from telethon.tl.functions.channels import EditBannedRequest
+from telethon.tl.types import ChatBannedRights
+from telethon.errors import FloodWaitError
 
-# WESTEROS SETTINGS
-BOT_NAME = "WESTEROS MUSIC"
-BOT_ICON = "🏰"
-OWNER_TAG = "@Westeros"
+# --- AYARLAR ---
+API_ID = '33188452'
+API_HASH = 'ac4afbd122081956a173b16590c02609'
+BOT_TOKEN = '8291565350:AAFji4pYPQiVtgiycCRwIK2DbtfJQmJA9LY'
+BOT_SAHIPLERI = [8446478484]
 
-API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
+# AYNI ANDA ÇALIŞACAK YASAKLAMA İŞÇİ SAYISI (ULTRA MAX İÇİN 100)
+CONCURRENT_BANS = 100
 
-bot = Client(
-    "westeros_music_bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN
+# Yasaklama hakları (tüm yetkiler kısıtlanır)
+BAN_RIGHTS = ChatBannedRights(
+    until_date=None,
+    view_messages=True,
+    send_messages=True,
+    send_media=True,
+    send_stickers=True,
+    send_gifs=True,
+    send_games=True,
+    send_inline=True,
+    embed_links=True,
+    send_polls=True,
+    change_info=True,
+    invite_users=True,
+    pin_messages=True
 )
 
-call = PyTgCalls(bot)
+# İstemci oluştur
+client = TelegramClient('bot_session_max', API_ID, API_HASH)
 
-queues = {}
-playing = {}
+# Flood korumasını tamamen kaldır (riskli, ultra hız için)
+client.flood_sleep_threshold = 0
 
-# DOWNLOAD
-def download(query):
+logging.basicConfig(level=logging.ERROR)
+ban_active = False
 
-    ydl_opts = {
-        "format": "bestaudio",
-        "outtmpl": "%(id)s.%(ext)s",
-        "quiet": True,
-        "noplaylist": True
-    }
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-
-        info = ydl.extract_info(f"ytsearch:{query}", download=True)
-        file = ydl.prepare_filename(info["entries"][0])
-        title = info["entries"][0]["title"]
-
-        return file, title
-
-
-# PLAY NEXT
-async def play_next(chat_id):
-
-    if chat_id in queues and queues[chat_id]:
-
-        file, title = queues[chat_id].pop(0)
-
-        await call.change_stream(
-            chat_id,
-            AudioPiped(file)
+@client.on(events.NewMessage(pattern='/start'))
+async def start_handler(event):
+    if event.sender_id in BOT_SAHIPLERI:
+        await event.respond(
+            "Avustralyakrallik Sikici Ban Botu (MAX HIZ)\n"
+            "Sahibim @xDeoddorant & @vesvese."
         )
 
-        playing[chat_id] = title
+@client.on(events.NewMessage(pattern='/sik'))
+async def god_mode_ban(event):
+    global ban_active
+    if event.sender_id not in BOT_SAHIPLERI:
+        return
+    if ban_active:
+        await event.respond("⏳ Zaten bir ban işlemi devam ediyor, lütfen bekleyin.")
+        return
 
+    chat = await event.get_chat()
+    ban_active = True
+    baslangic_zamani = time.time()
+    toplam_ban = 0
+    ban_sayaci_lock = asyncio.Lock()
 
-# START
-@bot.on_message(filters.command("start"))
-async def start(_, message: Message):
+    # Kuyruk: üretici üyeleri ekleyecek, işçiler tüketecek
+    queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 2)
 
-    text = f"""
-{BOT_ICON} **{BOT_NAME}**
+    # İşçi (consumer) görevi
+    async def ban_worker(worker_id):
+        nonlocal toplam_ban
+        while True:
+            try:
+                user_id = await queue.get()
+            except asyncio.CancelledError:
+                break
 
-⚔️ Westeros'un resmi müzik botu
+            try:
+                await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
+                async with ban_sayaci_lock:
+                    toplam_ban += 1
+            except FloodWaitError as e:
+                logging.warning(f"İşçi {worker_id}: FloodWait {e.seconds} saniye, bekleniyor...")
+                await asyncio.sleep(e.seconds)
+                # Tekrar dene
+                try:
+                    await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
+                    async with ban_sayaci_lock:
+                        toplam_ban += 1
+                except Exception as ex:
+                    logging.error(f"İşçi {worker_id}: Tekrar denemede hata (ID: {user_id}): {ex}")
+            except Exception as e:
+                logging.error(f"İşçi {worker_id}: Ban hatası (ID: {user_id}): {e}")
+            finally:
+                queue.task_done()
 
-Komutlar:
+    # Üretici (producer) görevi – üyeleri topla ve kuyruğa ekle
+    async def producer():
+        try:
+            async for user in client.iter_participants(chat):
+                if not user.bot and not user.is_self:
+                    await queue.put(user.id)
+        except Exception as e:
+            logging.error(f"Üretici hatası: {e}")
 
-▶️ /play şarkı adı
-⏭️ /skip
-⏸️ /pause
-▶️ /resume
-⏹️ /stop
-📜 /queue
+    # İşçileri başlat
+    workers = [asyncio.create_task(ban_worker(i)) for i in range(CONCURRENT_BANS)]
 
-🔥 Güç bizimle.
-"""
+    # Üreticiyi başlat
+    producer_task = asyncio.create_task(producer())
 
-    await message.reply(text)
+    # Üreticinin bitmesini bekle
+    await producer_task
 
+    # Kuyruğa artık yeni öğe gelmeyeceğini belirt
+    await queue.join()
 
-# PLAY
-@bot.on_message(filters.command("play"))
-async def play(_, message: Message):
+    # İşçileri durdur
+    for w in workers:
+        w.cancel()
+    await asyncio.gather(*workers, return_exceptions=True)
 
-    if len(message.command) < 2:
-        return await message.reply("⚠️ Kullanım:\n/play şarkı adı")
-
-    chat_id = message.chat.id
-
-    query = " ".join(message.command[1:])
-
-    msg = await message.reply(f"{BOT_ICON} Westeros müzik aranıyor...")
-
-    file, title = download(query)
-
-    if chat_id not in queues:
-        queues[chat_id] = []
-
-    if chat_id in playing:
-
-        queues[chat_id].append((file, title))
-
-        return await msg.edit(
-            f"📜 **Sıraya eklendi**\n\n🎵 {title}\n\n{BOT_ICON} {BOT_NAME}"
-        )
-
-    await call.join_group_call(
-        chat_id,
-        AudioPiped(file)
+    gecen_sure = time.time() - baslangic_zamani
+    await event.respond(
+        f"✅ İşlem Tamamlandı (ULTRA MAX HIZ)\n"
+        f"Süre: {gecen_sure:.1f} saniye.\n"
+        f"Toplam Ban: {toplam_ban}"
     )
 
-    playing[chat_id] = title
+    ban_active = False
 
-    await msg.edit(
-        f"▶️ **Şimdi çalıyor**\n\n🎵 {title}\n\n{BOT_ICON} {BOT_NAME}"
-    )
-
-
-# SKIP
-@bot.on_message(filters.command("skip"))
-async def skip(_, message: Message):
-
-    chat_id = message.chat.id
-
-    if chat_id not in queues or not queues[chat_id]:
-        return await message.reply("⚠️ Sırada müzik yok")
-
-    await play_next(chat_id)
-
-    await message.reply(f"⏭️ Atlandı\n{BOT_ICON} {BOT_NAME}")
-
-
-# PAUSE
-@bot.on_message(filters.command("pause"))
-async def pause(_, message: Message):
-
-    await call.pause_stream(message.chat.id)
-
-    await message.reply(f"⏸️ Duraklatıldı\n{BOT_ICON} {BOT_NAME}")
-
-
-# RESUME
-@bot.on_message(filters.command("resume"))
-async def resume(_, message: Message):
-
-    await call.resume_stream(message.chat.id)
-
-    await message.reply(f"▶️ Devam ediyor\n{BOT_ICON} {BOT_NAME}")
-
-
-# STOP
-@bot.on_message(filters.command("stop"))
-async def stop(_, message: Message):
-
-    chat_id = message.chat.id
-
-    queues[chat_id] = []
-    playing.pop(chat_id, None)
-
-    await call.leave_group_call(chat_id)
-
-    await message.reply(f"⏹️ Westeros sustu\n{BOT_ICON} {BOT_NAME}")
-
-
-# QUEUE
-@bot.on_message(filters.command("queue"))
-async def queue(_, message: Message):
-
-    chat_id = message.chat.id
-
-    if chat_id not in queues or not queues[chat_id]:
-        return await message.reply("📜 Sıra boş")
-
-    text = f"{BOT_ICON} **Westeros Sırası:**\n\n"
-
-    for i, (_, title) in enumerate(queues[chat_id]):
-        text += f"{i+1}. {title}\n"
-
-    await message.reply(text)
-
-
-# MAIN
-async def main():
-
-    await bot.start()
-    await call.start()
-
-    print(f"{BOT_NAME} aktif")
-
-    await idle()
-
-
-asyncio.run(main())
+print("🚀 Bot ULTRA MAX HIZ ile başlatılıyor (ÇOK RİSKLİ)...")
+client.start(bot_token=BOT_TOKEN)
+client.run_until_disconnected()
