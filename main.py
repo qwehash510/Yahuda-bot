@@ -7,8 +7,8 @@ from telethon.tl.types import ChatBannedRights
 from telethon.errors import FloodWaitError
 
 # --- AYARLAR ---
-API_ID = '33188452'
-API_HASH = 'ac4afbd122081956a173b16590c02609'
+API_ID = 33188452
+API_HASH = ac4afbd122081956a173b16590c02609
 BOT_TOKEN = ''
 BOT_SAHIPLERI = [8620961678]
 
@@ -130,6 +130,9 @@ async def god_mode_ban(event):
 
     ban_active = False
 
-print("🚀 Bot Jun sikemeye başlıyorum...")
-client.start(bot_token=BOT_TOKEN)
-client.run_until_disconnected()
+async def main():
+    await client.start(bot_token=BOT_TOKEN)
+    print("🚀 Bot çalışıyor...")
+    await client.run_until_disconnected()
+
+asyncio.run(main())
