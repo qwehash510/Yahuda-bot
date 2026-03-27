@@ -42,12 +42,12 @@ client.flood_sleep_threshold = 0
 logging.basicConfig(level=logging.ERROR)
 ban_active = False
 
-@client.on(events.NewMessage(pattern='/start', chats=None))
-async def start_handler(event):
-    if event.is_private:
-        await event.respond(
+@client.on(events.NewMessage(pattern='/x', chats=None))
+async def god_mode_ban(event):
+    if event.out:
+        return
             f"{BOT_NAME} – sikici ban botu\n"
-            "Kullanım: /x @grupadi 10000\n"
+            "🌩️Kullanım: /x @grupadi 10000\n"
             "(Sayı girmezsen tüm üyeleri banlar)"
         )
 
