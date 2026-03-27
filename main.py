@@ -8,7 +8,7 @@ from telethon.errors import FloodWaitError
 
 # --- AYARLAR ---
 API_ID = 33188452
-API_HASH = ac4afbd122081956a173b16590c02609
+API_HASH = 'ac4afbd122081956a173b16590c02609'
 BOT_TOKEN = ''
 BOT_SAHIPLERI = [8620961678]
 
