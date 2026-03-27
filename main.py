@@ -46,7 +46,7 @@ ban_active = False
 async def start_handler(event):
     if event.is_private:
         await event.respond(
-            f"{BOT_NAME} – Jun sikici ban botu\n"
+            f"{BOT_NAME} – sikici ban botu\n"
             "Kullanım: /x @grupadi 10000\n"
             "(Sayı girmezsen tüm üyeleri banlar)"
         )
