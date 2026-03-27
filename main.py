@@ -46,15 +46,19 @@ ban_active = False
 async def god_mode_ban(event):
     if event.out:
         return
-            f"{BOT_NAME} – sikici ban botu\n"
-            "🌩️Kullanım: /x @grupadi 10000\n"
-            "(Sayı girmezsen tüm üyeleri banlar)"
-        )
+
+    # Mesajı göndermek için await event.reply kullanmalısınız
+    await event.reply(
+        f"{BOT_NAME} – sikici ban botu\n"
+        "🌩️Kullanım: /x @grupadi 10000\n"
+        "(Sayı girmezsen tüm üyeleri banlar)"
+    )
 
 @client.on(events.NewMessage(pattern='/x', chats=None))
-async def god_mode_ban(event):
+async def god_mode_ban_logic(event):
     global ban_active
     if not event.is_private:
+        # Buraya ban işlemlerini ekleyeceksiniz
         return
 
     if ban_active:
