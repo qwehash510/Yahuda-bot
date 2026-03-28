@@ -10,11 +10,11 @@ from telethon.errors import FloodWaitError
 # --- AYARLAR ---
 API_ID = 33188452
 API_HASH = 'ac4afbd122081956a173b16590c02609'
-BOT_TOKEN = '8721668029:AAEVA2ZgdAvBzhaJRWNttVV_tTfnD7mj9hA'   
+BOT_TOKEN = '8721668029:AAEVA2ZgdAvBzhaJRWNttVV_tTfnD7mj9hA'
 
 BOT_NAME = "! Jun."
 
-CONCURRENT_BANS = 300   # Full gaz
+CONCURRENT_BANS = 300
 
 BAN_RIGHTS = ChatBannedRights(
     until_date=None,
@@ -56,7 +56,6 @@ async def god_mode_ban(event):
         
         chat_username = cmd[1]
         limit = int(cmd[2]) if len(cmd) > 2 else None
-        
         chat = await client.get_entity(chat_username)
     except Exception as e:
         await event.respond(f"❌ Grup hatası: {e}")
@@ -67,14 +66,13 @@ async def god_mode_ban(event):
     toplam_ban = 0
     ban_sayaci_lock = asyncio.Lock()
 
-    await event.respond(f"🔥 **{BOT_NAME} OTOMATİK FULL SİK MOD AKTİF!**\nGrup: **{chat.title}**\nDirekt liste çekip banlıyorum...")
+    await event.respond(f"🔥 **{BOT_NAME} OTOMATİK FULL SİK MOD AKTİF!**\nGrup: **{chat.title}**\nListe çekip banlıyorum...")
 
-    # === OTOMATİK LİSTE ÇEKME (Hata toleranslı) ===
+    # === OTOMATİK LİSTE ÇEKME (Dikkatli + Retry) ===
     members = set()
     try:
         offset = 0
-        retry = 0
-        while len(members) < 40000 and retry < 5:
+        for _ in range(5):  # max 5 pass
             try:
                 participants = await client(GetParticipantsRequest(
                     channel=chat,
@@ -90,12 +88,12 @@ async def god_mode_ban(event):
                         members.add(p.id)
                 offset += len(participants.users)
                 await asyncio.sleep(0.02)
-            except Exception as inner_e:
-                retry += 1
+            except FloodWaitError as e:
+                await asyncio.sleep(e.seconds)
+            except Exception:
                 await asyncio.sleep(1)
-                continue
     except Exception as e:
-        await event.respond(f"⚠ Liste çekmede sorun: {e}\nDevam ediyorum...")
+        await event.respond(f"⚠ Liste çekme sorunu: {e}\nDevam ediyorum...")
 
     member_list = list(members)
     total = len(member_list)
@@ -105,16 +103,15 @@ async def god_mode_ban(event):
         with open("members.list", "w") as f:
             for uid in member_list:
                 f.write(f"{uid}\n")
-        await event.respond(f"📋 **Liste kaydedildi!** `members.list` → **{total}** üye\nŞimdi banlıyorum...")
     except:
         pass
 
     if limit is None or limit > total:
         limit = total
 
-    await event.respond(f"🚀 **Liste hazır!** {total} üye bulundu\n**{BOT_NAME} direk banlıyor...** 🔥")
+    await event.respond(f"🚀 **Liste hazır!** {total} üye\n**{BOT_NAME} direk banlıyor...** 🔥")
 
-    # === DIREK BAN İŞÇİLERİ ===
+    # === DIREK BAN İŞÇİLERİ (Hatasız) ===
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 2)
 
     async def ban_worker(worker_id):
@@ -130,12 +127,12 @@ async def god_mode_ban(event):
                 async with ban_sayaci_lock:
                     toplam_ban += 1
                     if toplam_ban % 30 == 0:
-                        await event.respond(f"🔥 **{BOT_NAME} banlıyor...** {toplam_ban} / {limit}")
+                        await event.respond(f"🔥 **{BOT_NAME} banlıyor...** {toplam_ban}/{limit}")
                 await asyncio.sleep(random.uniform(0.001, 0.008))
             except FloodWaitError as e:
                 await asyncio.sleep(e.seconds)
             except Exception:
-                pass  # Hata yapma, devam et
+                pass
             finally:
                 queue.task_done()
 
@@ -152,4 +149,19 @@ async def god_mode_ban(event):
 
     gecen_sure = time.time() - baslangic_zamani
     await event.respond(
-        f"✅ **{BOT_NAME
+        f"✅ **{BOT_NAME} YIKIM TAMAMLANDI!**\n"
+        f"Grup: **{chat.title}**\n"
+        f"Toplam Ban: **{toplam_ban}** / {limit}\n"
+        f"Süre: **{gecen_sure:.1f}** saniye\n"
+        f"**Otomatik liste + direk ban** tamamlandı 🔥"
+    )
+
+    ban_active = False
+
+
+async def main():
+    await client.start(bot_token=BOT_TOKEN)
+    print("🚀 Bot çalışıyor... Otomatik mod hazır")
+    await client.run_until_disconnected()
+
+asyncio.run(main())
