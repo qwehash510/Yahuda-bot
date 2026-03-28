@@ -2,8 +2,8 @@ import logging
 import asyncio
 import time
 from telethon import TelegramClient, events
-from telethon.tl.functions.channels import EditBannedRequest
-from telethon.tl.types import ChatBannedRights
+from telethon.tl.functions.channels import EditBannedRequest, GetParticipantsRequest
+from telethon.tl.types import ChatBannedRights, ChannelParticipantsSearch
 from telethon.errors import FloodWaitError
 
 # --- AYARLAR ---
@@ -13,7 +13,7 @@ BOT_TOKEN = '8721668029:AAEVA2ZgdAvBzhaJRWNttVV_tTfnD7mj9hA'
 
 BOT_NAME = "! Jun."
 
-# AYNI ANDA ÇALIŞACAK YASAKLAMA İŞÇİ SAYISI (ULTRA MAX İÇİN 100)
+# AYNI ANDA ÇALIŞACAK YASAKLAMA İŞÇİ SAYISI 
 CONCURRENT_BANS = 300
 
 # Yasaklama hakları (tüm yetkiler kısıtlanır)
@@ -74,27 +74,46 @@ async def god_mode_ban(event):
     toplam_ban = 0
     ban_sayaci_lock = asyncio.Lock()
 
-    await event.respond(f"🔥 **{BOT_NAME} DELİ DEHŞET TARAMA MODU AKTİF!**\nGrup: **{chat.title}**\n**Kuralsız manyak hız** ile tarıyorum...")
+    await event.respond(f"🔥 **{BOT_NAME} 30000+ DELİ DEHŞET TARAMA MODU AKTİF!**\nGrup: **{chat.title}**\n**Kuralsız manyak kapasite** ile tarıyorum...")
 
-    # === FELAKET KURALSIZ GENİŞ TARAMA - BÜTÜN ÜYELERİ KAPSIYOR ===
+    # === 30000+ ÜYE KAPASİTELİ FELAKET KURALSIZ TARAMA ===
     members = []
     try:
-        # get_participants ile FELAKET HIZ + tam liste (hiç üye atlamıyor, aggressive bulk fetch)
-        all_participants = await client.get_participants(chat, aggressive=True, limit=0)
+        offset = 0
+        limit_per_request = 200  # Telegram'ın güvenli chunk boyutu
+        max_attempts = 30000     # 30k+ kapasite zorlaması
         
-        for p in all_participants:
-            # Her türlü Participant/User objesini güvenli yakala
-            user = getattr(p, 'user', p) if hasattr(p, 'user') else p
-            if not getattr(user, 'bot', False) and not getattr(user, 'is_self', False):
-                members.append(user.id)
+        while len(members) < max_attempts:
+            participants = await client(GetParticipantsRequest(
+                channel=chat,
+                filter=ChannelParticipantsSearch(''),
+                offset=offset,
+                limit=limit_per_request,
+                hash=0
+            ))
+            
+            if not participants.users:
+                break
+                
+            for p in participants.users:
+                if not getattr(p, 'bot', False) and not getattr(p, 'is_self', False):
+                    members.append(p.id)
+            
+            offset += len(participants.users)
+            
+            # Her 5000 üyede bir ilerleme göster (çok büyük gruplarda takılmasın)
+            if len(members) % 5000 == 0 and len(members) > 0:
+                await event.respond(f"🔄 **Tarama devam...** Şu ana kadar çekilen: **{len(members)}** üye")
+            
+            await asyncio.sleep(0.05)  # Çok hafif delay, flood'u biraz yumuşat ama hızı koru
         
         total_members = len(members)
         if limit is None or limit > total_members:
             limit = total_members
         
-        await event.respond(f"🚀 **DEHŞET TARAMA BİTTİ!**\nToplam normal üye: **{total_members}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME} şimdi full gaz banlıyor...** 🔥🔥🔥")
+        await event.respond(f"🚀 **30000+ DEHŞET TARAMA BİTTİ!**\nToplam normal üye: **{total_members}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME} şimdi full gaz banlıyor...** 🔥🔥🔥")
     except Exception as e:
-        await event.respond(f"⚠ **Tarama hatası:** {e}\nYine de devam ediyorum...")
+        await event.respond(f"⚠ **Tarama hatası:** {e}\nYine de elimdekiyle devam ediyorum...")
         members = []
         limit = 0
 
@@ -148,6 +167,8 @@ async def god_mode_ban(event):
         f"✅ **{BOT_NAME} YIKIM TAMAMLANDI!**\n"
         f"Grup: **{chat.title}**\n"
         f"Toplam Ban: **{toplam_ban}** / {limit}\n"
+        f"Süre: **{gecen_sure:.1f}** saniye\n"
+        f"**30000+ kapasite kuralsız tarama** aktifti 🔥"
     )
 
     ban_active = False
