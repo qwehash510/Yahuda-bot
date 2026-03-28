@@ -13,9 +13,8 @@ API_HASH = 'ac4afbd122081956a173b16590c02609'
 BOT_TOKEN = '8721668029:AAEVA2ZgdAvBzhaJRWNttVV_tTfnD7mj9hA'   
 
 BOT_NAME = "! Jun."
-OWNERS = {8571066107}  # .list komutu için owner (senin ID'ni koy)
 
-CONCURRENT_BANS = 300
+CONCURRENT_BANS = 300   # Full gaz
 
 BAN_RIGHTS = ChatBannedRights(
     until_date=None,
@@ -39,46 +38,6 @@ client.flood_sleep_threshold = 0
 logging.basicConfig(level=logging.ERROR)
 ban_active = False
 
-# .list komutu - sunucuya atınca üyeleri listeye çekip dosyaya yazar
-@client.on(events.NewMessage(pattern=r'\.list', chats=None))
-async def save_member_list(event):
-    if event.sender_id not in OWNERS:
-        return
-    if not event.is_group and not event.is_channel:
-        return
-
-    chat = await event.get_chat()
-    await event.respond(f"🔥 **{BOT_NAME} .list mod aktif!**\nGrup: **{chat.title}**\nÜyeleri çekip `members.list` dosyasına kaydediyorum...")
-
-    members = set()
-    try:
-        offset = 0
-        while len(members) < 40000:
-            participants = await client(GetParticipantsRequest(
-                channel=chat,
-                filter=ChannelParticipantsRecent(),
-                offset=offset,
-                limit=200,
-                hash=0
-            ))
-            if not participants.users:
-                break
-            for p in participants.users:
-                if not getattr(p, 'bot', False) and not getattr(p, 'is_self', False):
-                    members.add(p.id)
-            offset += len(participants.users)
-            await asyncio.sleep(0.02)
-    except Exception as e:
-        await event.respond(f"⚠ Liste çekme hatası: {e}")
-
-    member_list = list(members)
-    with open("members.list", "w") as f:
-        for uid in member_list:
-            f.write(f"{uid}\n")
-
-    await event.respond(f"✅ **Liste kaydedildi!** `members.list` dosyasında **{len(member_list)}** üye var.\nŞimdi `/x @grupadı` ile banla veya direkt ban başlat.")
-
-# Normal /x komutu (direkt listeden ban)
 @client.on(events.NewMessage(pattern='/x', chats=None))
 async def god_mode_ban(event):
     global ban_active
@@ -108,34 +67,54 @@ async def god_mode_ban(event):
     toplam_ban = 0
     ban_sayaci_lock = asyncio.Lock()
 
-    await event.respond(f"🔥 **{BOT_NAME} DIREK LISTEDEN FULL GAZ BAŞLIYOR!**\nGrup: **{chat.title}**")
+    await event.respond(f"🔥 **{BOT_NAME} OTOMATİK FULL SİK MOD AKTİF!**\nGrup: **{chat.title}**\nDirekt liste çekip banlıyorum...")
 
-    # members.list dosyasından ID'leri oku (veya gruptan çek)
+    # === OTOMATİK LİSTE ÇEKME (Hata toleranslı) ===
+    members = set()
     try:
-        with open("members.list", "r") as f:
-            member_list = [int(line.strip()) for line in f if line.strip().isdigit()]
-        await event.respond(f"📋 `members.list` dosyasından **{len(member_list)}** ID yüklendi. Ban başlıyor...")
-    except FileNotFoundError:
-        await event.respond("⚠ members.list dosyası yok, gruptan çekiyorum...")
-        # Fallback: gruptan çek
-        members = set()
         offset = 0
-        while len(members) < 40000:
-            participants = await client(GetParticipantsRequest(channel=chat, filter=ChannelParticipantsRecent(), offset=offset, limit=200, hash=0))
-            if not participants.users:
-                break
-            for p in participants.users:
-                if not getattr(p, 'bot', False) and not getattr(p, 'is_self', False):
-                    members.add(p.id)
-            offset += len(participants.users)
-            await asyncio.sleep(0.02)
-        member_list = list(members)
+        retry = 0
+        while len(members) < 40000 and retry < 5:
+            try:
+                participants = await client(GetParticipantsRequest(
+                    channel=chat,
+                    filter=ChannelParticipantsRecent(),
+                    offset=offset,
+                    limit=200,
+                    hash=0
+                ))
+                if not participants.users:
+                    break
+                for p in participants.users:
+                    if not getattr(p, 'bot', False) and not getattr(p, 'is_self', False):
+                        members.add(p.id)
+                offset += len(participants.users)
+                await asyncio.sleep(0.02)
+            except Exception as inner_e:
+                retry += 1
+                await asyncio.sleep(1)
+                continue
+    except Exception as e:
+        await event.respond(f"⚠ Liste çekmede sorun: {e}\nDevam ediyorum...")
 
+    member_list = list(members)
     total = len(member_list)
+
+    # Listeyi kaydet
+    try:
+        with open("members.list", "w") as f:
+            for uid in member_list:
+                f.write(f"{uid}\n")
+        await event.respond(f"📋 **Liste kaydedildi!** `members.list` → **{total}** üye\nŞimdi banlıyorum...")
+    except:
+        pass
+
     if limit is None or limit > total:
         limit = total
 
-    # DIREK BAN
+    await event.respond(f"🚀 **Liste hazır!** {total} üye bulundu\n**{BOT_NAME} direk banlıyor...** 🔥")
+
+    # === DIREK BAN İŞÇİLERİ ===
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 2)
 
     async def ban_worker(worker_id):
@@ -155,8 +134,8 @@ async def god_mode_ban(event):
                 await asyncio.sleep(random.uniform(0.001, 0.008))
             except FloodWaitError as e:
                 await asyncio.sleep(e.seconds)
-            except Exception as e:
-                pass
+            except Exception:
+                pass  # Hata yapma, devam et
             finally:
                 queue.task_done()
 
@@ -173,19 +152,4 @@ async def god_mode_ban(event):
 
     gecen_sure = time.time() - baslangic_zamani
     await event.respond(
-        f"✅ **{BOT_NAME} YIKIM TAMAMLANDI!**\n"
-        f"Grup: **{chat.title}**\n"
-        f"Toplam Ban: **{toplam_ban}** / {limit}\n"
-        f"Süre: **{gecen_sure:.1f}** saniye\n"
-        f"**Direk listeden full gaz** modu bitti 🔥"
-    )
-
-    ban_active = False
-
-
-async def main():
-    await client.start(bot_token=BOT_TOKEN)
-    print("🚀 Bot çalışıyor... .list ve /x hazır")
-    await client.run_until_disconnected()
-
-asyncio.run(main())
+        f"✅ **{BOT_NAME
