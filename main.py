@@ -9,7 +9,7 @@ from telethon.errors import FloodWaitError
 # --- AYARLAR ---
 API_ID = 33188452
 API_HASH = 'ac4afbd122081956a173b16590c02609'
-BOT_TOKEN = '8721668029:AAEVA2ZgdAvBzhaJRWNttVV_tTfnD7mj9hA'   # Burayı kendi bot token'ınla tamamla
+BOT_TOKEN = '8721668029:AAEVA2ZgdAvBzhaJRWNttVV_tTfnD7mj9hA'   
 
 BOT_NAME = "! Jun."
 
@@ -76,12 +76,16 @@ async def god_mode_ban(event):
 
     await event.respond(f"🔥 **{BOT_NAME} DELİ DEHŞET TARAMA MODU AKTİF!**\nGrup: **{chat.title}**\n**Kuralsız manyak hız** ile tarıyorum...")
 
-    # === DELİ DEHŞET KURALSIZ TARAMA ===
+    # === FELAKET KURALSIZ GENİŞ TARAMA - BÜTÜN ÜYELERİ KAPSIYOR ===
     members = []
     try:
-        # aggressive=True + limit=None ile en hızlı ve en tam tarama (Telegram limitlerini zorla)
-        async for user in client.iter_participants(chat, aggressive=True, limit=None):
-            if not user.bot and not user.is_self and not getattr(user.participant, 'admin_rights', None) and not getattr(user.participant, 'banned_rights', None):
+        # get_participants ile FELAKET HIZ + tam liste (hiç üye atlamıyor, aggressive bulk fetch)
+        all_participants = await client.get_participants(chat, aggressive=True, limit=0)
+        
+        for p in all_participants:
+            # Her türlü Participant/User objesini güvenli yakala
+            user = getattr(p, 'user', p) if hasattr(p, 'user') else p
+            if not getattr(user, 'bot', False) and not getattr(user, 'is_self', False):
                 members.append(user.id)
         
         total_members = len(members)
