@@ -14,7 +14,7 @@ BOT_TOKEN = '8721668029:AAEVA2ZgdAvBzhaJRWNttVV_tTfnD7mj9hA'   # Burayı kendi b
 BOT_NAME = "! Jun."
 
 # AYNI ANDA ÇALIŞACAK YASAKLAMA İŞÇİ SAYISI (ULTRA MAX İÇİN 100)
-CONCURRENT_BANS = 200
+CONCURRENT_BANS = 300
 
 # Yasaklama hakları (tüm yetkiler kısıtlanır)
 BAN_RIGHTS = ChatBannedRights(
