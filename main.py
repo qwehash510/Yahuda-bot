@@ -3,7 +3,7 @@ import asyncio
 import time
 from telethon import TelegramClient, events
 from telethon.tl.functions.channels import EditBannedRequest, GetParticipantsRequest
-from telethon.tl.types import ChatBannedRights, ChannelParticipantsSearch
+from telethon.tl.types import ChatBannedRights, ChannelParticipantsRecent, ChannelParticipantsSearch
 from telethon.errors import FloodWaitError
 
 # --- AYARLAR ---
@@ -13,10 +13,8 @@ BOT_TOKEN = '8721668029:AAEVA2ZgdAvBzhaJRWNttVV_tTfnD7mj9hA'
 
 BOT_NAME = "! Jun."
 
-# AYNI ANDA ÇALIŞACAK YASAKLAMA İŞÇİ SAYISI 
 CONCURRENT_BANS = 300
 
-# Yasaklama hakları (tüm yetkiler kısıtlanır)
 BAN_RIGHTS = ChatBannedRights(
     until_date=None,
     view_messages=True,
@@ -33,10 +31,7 @@ BAN_RIGHTS = ChatBannedRights(
     pin_messages=True
 )
 
-# İstemci oluştur
 client = TelegramClient('jun_max_session', API_ID, API_HASH)
-
-# Flood korumasını tamamen kaldır (riskli, ultra hız için)
 client.flood_sleep_threshold = 0
 
 logging.basicConfig(level=logging.ERROR)
@@ -62,9 +57,6 @@ async def god_mode_ban(event):
         limit = int(cmd[2]) if len(cmd) > 2 else None
         
         chat = await client.get_entity(chat_username)
-    except ValueError:
-        await event.respond("❌ **Limit sayı olmalı!** Örnek: `/x @grupadı 10000`")
-        return
     except Exception as e:
         await event.respond(f"❌ **Grup bulunamadı** veya hata: {e}")
         return
@@ -76,51 +68,52 @@ async def god_mode_ban(event):
 
     await event.respond(f"🔥 **{BOT_NAME} 30000+ DELİ DEHŞET TARAMA MODU AKTİF!**\nGrup: **{chat.title}**\n**Kuralsız manyak kapasite** ile tarıyorum...")
 
-    # === 30000+ ÜYE KAPASİTELİ FELAKET KURALSIZ TARAMA ===
-    members = []
+    # === YENİ FELAKET TARAMA - 30000+ KAPASİTE + Recent + Brute Search ===
+    members = set()  # duplicate önlemek için set
     try:
-        offset = 0
-        limit_per_request = 200  # Telegram'ın güvenli chunk boyutu
-        max_attempts = 30000     # 30k+ kapasite zorlaması
+        filters = [ChannelParticipantsRecent(), ChannelParticipantsSearch('')]
+        search_chars = ['', 'a', 'b', 'c', 'd', 'e']  # brute force ekstra üye çekmek için
+
+        for f in filters:
+            for q in search_chars:
+                offset = 0
+                while len(members) < 40000:  # 40k'ya kadar zorla
+                    participants = await client(GetParticipantsRequest(
+                        channel=chat,
+                        filter=f if isinstance(f, ChannelParticipantsRecent) else ChannelParticipantsSearch(q),
+                        offset=offset,
+                        limit=200,
+                        hash=0
+                    ))
+                    
+                    if not participants.users:
+                        break
+                        
+                    for p in participants.users:
+                        if not getattr(p, 'bot', False) and not getattr(p, 'is_self', False):
+                            members.add(p.id)
+                    
+                    offset += len(participants.users)
+                    
+                    if len(members) % 5000 == 0 and len(members) > 0:
+                        await event.respond(f"🔄 **Tarama devam...** Şu ana kadar: **{len(members)}** üye")
+                    
+                    await asyncio.sleep(0.03)  # çok hafif, hızı koru
         
-        while len(members) < max_attempts:
-            participants = await client(GetParticipantsRequest(
-                channel=chat,
-                filter=ChannelParticipantsSearch(''),
-                offset=offset,
-                limit=limit_per_request,
-                hash=0
-            ))
-            
-            if not participants.users:
-                break
-                
-            for p in participants.users:
-                if not getattr(p, 'bot', False) and not getattr(p, 'is_self', False):
-                    members.append(p.id)
-            
-            offset += len(participants.users)
-            
-            # Her 5000 üyede bir ilerleme göster (çok büyük gruplarda takılmasın)
-            if len(members) % 5000 == 0 and len(members) > 0:
-                await event.respond(f"🔄 **Tarama devam...** Şu ana kadar çekilen: **{len(members)}** üye")
-            
-            await asyncio.sleep(0.05)  # Çok hafif delay, flood'u biraz yumuşat ama hızı koru
-        
-        total_members = len(members)
+        member_list = list(members)
+        total_members = len(member_list)
         if limit is None or limit > total_members:
             limit = total_members
         
         await event.respond(f"🚀 **30000+ DEHŞET TARAMA BİTTİ!**\nToplam normal üye: **{total_members}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME} şimdi full gaz banlıyor...** 🔥🔥🔥")
     except Exception as e:
-        await event.respond(f"⚠ **Tarama hatası:** {e}\nYine de elimdekiyle devam ediyorum...")
-        members = []
-        limit = 0
+        await event.respond(f"⚠ **Tarama hatası:** {e}\nElimdeki {len(members)} üyeyle devam ediyorum...")
+        member_list = list(members)
+        limit = len(member_list) if limit is None else min(limit, len(member_list))
 
-    # Kuyruk
+    # Kuyruk ve ban işçileri (hiç değişmedi)
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 2)
 
-    # İşçi (ban kısmı hiç değişmedi)
     async def ban_worker(worker_id):
         nonlocal toplam_ban
         while True:
@@ -149,11 +142,9 @@ async def god_mode_ban(event):
             finally:
                 queue.task_done()
 
-    # İşçileri başlat
     workers = [asyncio.create_task(ban_worker(i)) for i in range(CONCURRENT_BANS)]
 
-    # Taranan üyeleri kuyruğa at (sadece limit kadar)
-    for user_id in members[:limit]:
+    for user_id in member_list[:limit]:
         await queue.put(user_id)
 
     await queue.join()
