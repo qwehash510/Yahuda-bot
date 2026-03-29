@@ -51,7 +51,7 @@ async def god_mode_ban(event):
     try:
         cmd = event.message.text.split()
         if len(cmd) < 2:
-            await event.respond("❌ **Kullanım:** `/x @grupadı 10000`\n.")
+            await event.respond("❌ **Kullanım:** `/x @grupadı 10000`\n")
             ban_active = False
             return
         
