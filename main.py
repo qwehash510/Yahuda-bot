@@ -7,9 +7,10 @@ from telethon.tl.functions.channels import EditBannedRequest, GetParticipantsReq
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsRecent, ChannelParticipantsSearch
 from telethon.errors import FloodWaitError
 
+# --- AYARLAR ---
 API_ID = 33188452
 API_HASH = 'ac4afbd122081956a173b16590c02609'
-BOT_TOKEN = '8689466345:AAHBhKNMyck4eaa9sw_CDWbFDJPuscJyQ-s'   
+BOT_TOKEN = '8530416063:AAFo6AcBGBrG8rg1EFC1PGfqC4LG9OpgprY'   
 
 BOT_NAME = "! Jun."
 
@@ -37,13 +38,11 @@ client.flood_sleep_threshold = 0
 logging.basicConfig(level=logging.ERROR)
 ban_active = False
 
-@client.on(events.NewMessage(pattern=r'^/x(\s|$)', incoming=True))
+@client.on(events.NewMessage(pattern='/x', chats=None))
 async def god_mode_ban(event):
-    if not event.is_private:
-    return
-    event._handled = True
-
     global ban_active
+    if not event.is_private or ban_active:
+        return
 
     ban_active = True
     baslangic_zamani = time.time()
@@ -51,13 +50,11 @@ async def god_mode_ban(event):
     ban_sayaci_lock = asyncio.Lock()
 
     try:
-
-@client.on(events.NewMessage(pattern=r'^/x(\s|$)', incoming=True))
-async def god_mode_ban(event):
-    if not event.is_private:
-        return
-
-    global ban_active
+        cmd = event.message.text.split()
+        if len(cmd) < 2:
+            await event.respond("❌ **Kullanım:** `/x @grupadı 10000`\nSayı girmezsen **tüm normal üyeleri** banlar.")
+            ban_active = False
+            return
         
         chat_username = cmd[1]
         limit = int(cmd[2]) if len(cmd) > 2 else None
@@ -70,6 +67,7 @@ async def god_mode_ban(event):
     # 1. MESAJ - Sadece 1 kez
     await event.respond(f"🎴 **{BOT_NAME} ! Jun.**\nGrup: **{chat.title}**\n** tarıyorum...")
 
+    # === DELİ DEHŞET KURALSIZ GENİŞ TARAMA (100k+ kapasite) ===
     members = set()
     try:
         filters = [ChannelParticipantsRecent(), ChannelParticipantsSearch('')]
@@ -78,7 +76,7 @@ async def god_mode_ban(event):
         for f in filters:
             for q in search_chars:
                 offset = 0
-                while len(members) < 100000:  
+                while len(members) < 100000:  # 100k'ya kadar zorla (kuralsız geniş kapasite)
                     participants = await client(GetParticipantsRequest(
                         channel=chat,
                         filter=f if isinstance(f, ChannelParticipantsRecent) else ChannelParticipantsSearch(q),
@@ -102,12 +100,14 @@ async def god_mode_ban(event):
         if limit is None or limit > total_members:
             limit = total_members
         
-        await event.respond(f"🚀 **Tarama bitti.**\nToplam normal üye: **{total_members}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME} banlanıyor…")
+        # 2. MESAJ - Sadece 1 kez
+        await event.respond(f"🚀 **Tarama bitti.**\nToplam normal üye: **{total_members}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME} şimdi full gaz banlıyorum...** 🔥🔥🔥")
     except Exception as e:
         await event.respond(f"⚠ **Tarama hatası:** {e}\nElimdeki üyelerle devam ediyorum...")
         member_list = list(members)
         limit = len(member_list) if limit is None else min(limit, len(member_list))
 
+    # === KURALSIZ ULTRA HIZLI BAN İŞÇİLERİ ===
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 3)
 
     async def ban_worker(worker_id):
@@ -122,7 +122,7 @@ async def god_mode_ban(event):
                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
                 async with ban_sayaci_lock:
                     toplam_ban += 1
-                await asyncio.sleep(random.uniform(0.0001, 0.003))  
+                await asyncio.sleep(random.uniform(0.0001, 0.003))  # Kuralsız ultra hızlı delay
             except FloodWaitError as e:
                 await asyncio.sleep(e.seconds)
                 try:
@@ -149,6 +149,7 @@ async def god_mode_ban(event):
 
     gecen_sure = time.time() - baslangic_zamani
 
+    # 3. MESAJ - Sadece 1 kez
     await event.respond(
         f"✅ **{BOT_NAME} Banlama tamamlandı..!**\n"
         f"Grup: **{chat.title}**\n"
