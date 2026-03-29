@@ -51,11 +51,13 @@ async def god_mode_ban(event):
     ban_sayaci_lock = asyncio.Lock()
 
     try:
-        cmd = event.message.text.split()
-        if len(cmd) < 2:
-            await event.respond("❌ **Kullanım:** `/x @grupadı 10000`\n")
-            ban_active = False
-            return
+
+@client.on(events.NewMessage(pattern=r'^/x(\s|$)', incoming=True))
+async def god_mode_ban(event):
+    if not event.is_private:
+        return
+
+    global ban_active
         
         chat_username = cmd[1]
         limit = int(cmd[2]) if len(cmd) > 2 else None
