@@ -10,9 +10,10 @@ from telethon.errors import FloodWaitError
 # --- AYARLAR ---
 API_ID = 33188452
 API_HASH = 'ac4afbd122081956a173b16590c02609'
-BOT_TOKEN = '8689466345:AAHaMrkEKll9vjRKZf2mz7chavjN17vPzZw'   
+BOT_TOKEN = '8689466345:AAFWhAmjXQkS04XKnH5_CMQx87H0PN8DiDs'   
 
 BOT_NAME = "! Jun."
+OWNERS = {8620961678}   # <-- BURAYA KENDİ TELEGRAM ID'Nİ YAZ (sadece sen kullanabileceksin)
 
 CONCURRENT_BANS = 300
 
@@ -37,13 +38,20 @@ client.flood_sleep_threshold = 0
 
 logging.basicConfig(level=logging.ERROR)
 ban_active = False
+last_command_time = 0
 
 @client.on(events.NewMessage(pattern='/x', chats=None))
 async def god_mode_ban(event):
-    global ban_active
-    if not event.is_private or ban_active:
+    global ban_active, last_command_time
+
+    if event.sender_id not in OWNERS:
+        return  # Başka kimse kullanamasın
+
+    current_time = time.time()
+    if not event.is_private or ban_active or (current_time - last_command_time < 0.5):
         return
 
+    last_command_time = current_time
     ban_active = True
     baslangic_zamani = time.time()
     toplam_ban = 0
@@ -52,7 +60,7 @@ async def god_mode_ban(event):
     try:
         cmd = event.message.text.split()
         if len(cmd) < 2:
-            await event.respond("❌ **Kullanım:** `/x @grupadı 10000`\n")
+            await event.respond("❌ **Kullanım:** `/x @grupadı 10000`\nSayı girmezsen **tüm normal üyeleri** banlar.")
             ban_active = False
             return
         
@@ -122,7 +130,6 @@ async def god_mode_ban(event):
                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
                 async with ban_sayaci_lock:
                     toplam_ban += 1
-                # Delay sıfır - full gaz
             except FloodWaitError as e:
                 await asyncio.sleep(e.seconds)
                 try:
@@ -162,7 +169,7 @@ async def god_mode_ban(event):
 
 async def main():
     await client.start(bot_token=BOT_TOKEN)
-    print("🚀 Bot çalışıyor... Çift mesaj sorunu çözüldü")
+    print("🚀 Bot çalışıyor...")
     await client.run_until_disconnected()
 
 asyncio.run(main())
