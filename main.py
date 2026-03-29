@@ -37,7 +37,7 @@ client.flood_sleep_threshold = 0
 logging.basicConfig(level=logging.ERROR)
 ban_active = False
 
-@client.on(events.NewMessage(pattern='/x', chats=None))
+@client.on(events.NewMessage(pattern=r'^/x$', chats=None))
 async def god_mode_ban(event):
     global ban_active
     if not event.is_private or ban_active:
