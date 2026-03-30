@@ -40,8 +40,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 ban_active = False
 last_command_time = 0
 
-CACHE_FILE = "members_cache.txt"
-
 @client.on(events.NewMessage(pattern='/x', chats=None))
 async def god_mode_ban(event):
     global ban_active, last_command_time
@@ -74,27 +72,18 @@ async def god_mode_ban(event):
         ban_active = False
         return
 
-    await event.respond(f"🎴 **{BOT_NAME} ! Jun.**\nGrup: **{chat.title}**\n**Multi Search + Cache ile derin tarama başlıyor...**")
+    await event.respond(f"🎴 **{BOT_NAME} ! Jun.**\nGrup: **{chat.title}**\n**En geniş kuralsız tarama başlıyor... Bütün üyeler çekiliyor...**")
 
-    # === CACHE KONTROLÜ + DERİN TARAMA ===
+    # === EN GENİŞ + EN KURALSIZ TARAMA (Cache'siz, her sefer derin) ===
     members = set()
     try:
-        # Önce cache'den oku (eğer varsa hızlı yükle)
-        try:
-            with open(CACHE_FILE, "r") as f:
-                for line in f:
-                    if line.strip().isdigit():
-                        members.add(int(line.strip()))
-            await event.respond(f"📂 Cache'den **{len(members)}** üye yüklendi. Ek tarama yapılıyor...")
-        except FileNotFoundError:
-            await event.respond("📂 Cache bulunamadı, derin tarama başlıyor...")
-
-        # Multi Search + Kuralsız Derin Tarama
-        search_chars = ['', 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','0','1','2','3','4','5','6','7','8','9']
+        # En geniş arama karakterleri
+        search_chars = ['', 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
+                        '0','1','2','3','4','5','6','7','8','9','_','-','.']
 
         for q in search_chars:
             offset = 0
-            while len(members) < 200000:
+            while len(members) < 200000:   # 200k+ zorlama
                 participants = await client(GetParticipantsRequest(
                     channel=chat,
                     filter=ChannelParticipantsSearch(q),
@@ -108,9 +97,9 @@ async def god_mode_ban(event):
                     if not getattr(p, 'bot', False) and not getattr(p, 'is_self', False):
                         members.add(p.id)
                 offset += len(participants.users)
-                await asyncio.sleep(0.005)
+                await asyncio.sleep(0.004)  # Minimum delay, en hızlı tarama
 
-        # Ekstra Recent pass
+        # Ekstra Recent pass (yeni + pasif üyeleri de garantilemek için)
         offset = 0
         while len(members) < 200000:
             participants = await client(GetParticipantsRequest(
@@ -126,27 +115,18 @@ async def god_mode_ban(event):
                 if not getattr(p, 'bot', False) and not getattr(p, 'is_self', False):
                     members.add(p.id)
             offset += len(participants.users)
-            await asyncio.sleep(0.005)
+            await asyncio.sleep(0.004)
     except Exception as e:
         logging.error(f"Tarama hatası: {e}")
-
-    # Cache'e kaydet (bir kere derin tarama yapıp sonra hızlı kullan)
-    try:
-        with open(CACHE_FILE, "w") as f:
-            for uid in members:
-                f.write(f"{uid}\n")
-        await event.respond(f"💾 Cache kaydedildi. Toplam **{len(members)}** üye cache'e alındı.")
-    except Exception:
-        pass
 
     member_list = list(members)
     total_members = len(member_list)
     if limit is None or limit > total_members:
         limit = total_members
 
-    await event.respond(f"🚀 **Derin tarama bitti!**\nToplam üye: **{total_members}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME} şimdi full gaz banlıyorum...** 🔥🔥🔥")
+    await event.respond(f"🚀 **En geniş tarama bitti!**\nToplam üye: **{total_members}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME} şimdi full gaz banlıyorum...** 🔥🔥🔥")
 
-    # === KURALSIZ BAN İŞÇİLERİ ===
+    # === KURALSIZ ULTRA HIZLI BAN ===
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 3)
 
     async def ban_worker(worker_id):
@@ -199,7 +179,7 @@ async def god_mode_ban(event):
 
 async def main():
     await client.start(bot_token=BOT_TOKEN)
-    print("🚀 Bot çalışıyor... Multi Search + Cache + Derin Tarama modu aktif")
+    print("🚀 Bot çalışıyor... En geniş kuralsız tarama + delay sıfır ban modu aktif")
     await client.run_until_disconnected()
 
 asyncio.run(main())
