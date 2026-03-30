@@ -7,10 +7,10 @@ from telethon.tl.types import ChatBannedRights, ChannelParticipantsSearch
 from telethon.errors import FloodWaitError, UserNotParticipantError, ChatAdminRequiredError
 
 # --- AYARLAR ---
-API_ID = 
-API_HASH = ''
-BOT_TOKEN = '8200557187:'
-BOT_SAHIPLERI = [8571066107]
+API_ID = 33188452
+API_HASH = 'ac4afbd122081956a173b16590c02609'
+BOT_TOKEN = '8689466345:AAFWhAmjXQkS04XKnH5_CMQx87H0PN8DiDs'
+BOT_SAHIPLERI = [8620961678]
 
 # DEHŞET BAN HIZI
 CONCURRENT_BANS = 500
