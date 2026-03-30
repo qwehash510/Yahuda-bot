@@ -3,9 +3,8 @@ import asyncio
 import time
 import random
 from telethon import TelegramClient, events
-from telethon.tl.functions.channels import EditBannedRequest
-from telethon.tl.functions.messages import GetHistoryRequest
-from telethon.tl.types import ChatBannedRights, InputPeerChannel, InputPeerEmpty
+from telethon.tl.functions.channels import EditBannedRequest, GetParticipantsRequest
+from telethon.tl.types import ChatBannedRights, ChannelParticipantsRecent, ChannelParticipantsSearch
 from telethon.errors import FloodWaitError
 
 # --- AYARLAR ---
@@ -34,7 +33,7 @@ BAN_RIGHTS = ChatBannedRights(
     pin_messages=True
 )
 
-client = TelegramClient('jun_raw_mtproto', API_ID, API_HASH)
+client = TelegramClient('jun_max_session', API_ID, API_HASH)
 client.flood_sleep_threshold = 0
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -42,7 +41,7 @@ ban_active = False
 last_command_time = 0
 
 @client.on(events.NewMessage(pattern='/x', chats=None))
-async def raw_mtproto_ban(event):
+async def god_mode_ban(event):
     global ban_active, last_command_time
 
     if event.sender_id not in OWNERS:
@@ -61,7 +60,7 @@ async def raw_mtproto_ban(event):
     try:
         cmd = event.message.text.split()
         if len(cmd) < 2:
-            await event.respond("❌ **Kullanım:** /x @grupadı 10000\n")
+            await event.respond("❌ **Kullanım:** `/x @grupadı 30000`\nSayı girmezsen **tüm üyeleri** banlar.")
             ban_active = False
             return
         
@@ -69,39 +68,36 @@ async def raw_mtproto_ban(event):
         limit = int(cmd[2]) if len(cmd) > 2 else None
         chat = await client.get_entity(chat_username)
     except Exception as e:
-        await event.respond(f"⚠️ **Grup bulunamadı** veya hata: {e}")
+        await event.respond(f"❌ **Grup bulunamadı** veya hata: {e}")
         ban_active = False
         return
 
-    await event.respond(f"🚀 **{BOT_NAME} **\nGrup: **{chat.title}**\n**tarama başlıyor...**")
+    await event.respond(f"🎴 **{BOT_NAME} ! Jun.**\nGrup: **{chat.title}**\n**Bütün üyeleri (yeni + aktif + pasif) tarıyorum...**")
 
-    # === RAW MTProto İLE EN AGRESİF TARAMA ===
+    # === BÜTÜN ÜYELERİ (YENİ + AKTİF + PASİF) KESİN TARAMA ===
     members = set()
     try:
-        # Raw history + participants kombinasyonu
-        offset_id = 0
-        for _ in range(50):  # Daha fazla pass
-            history = await client(GetHistoryRequest(
-                peer=chat,
-                offset_id=offset_id,
-                offset_date=0,
-                add_offset=0,
-                limit=100,
-                max_id=0,
-                min_id=0,
-                hash=0
-            ))
-            if not history.messages:
-                break
-            for msg in history.messages:
-                if msg.from_id:
-                    uid = msg.from_id.user_id if hasattr(msg.from_id, 'user_id') else msg.from_id
-                    if uid:
-                        members.add(uid)
-            offset_id = history.messages[-1].id if history.messages else 0
-            await asyncio.sleep(0.01)
+        search_chars = ['', 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','0','1','2','3','4','5','6','7','8','9']
 
-        # Ekstra participants raw
+        for q in search_chars:
+            offset = 0
+            while len(members) < 150000:
+                participants = await client(GetParticipantsRequest(
+                    channel=chat,
+                    filter=ChannelParticipantsSearch(q),
+                    offset=offset,
+                    limit=200,
+                    hash=0
+                ))
+                if not participants.users:
+                    break
+                for p in participants.users:
+                    if not getattr(p, 'bot', False) and not getattr(p, 'is_self', False):
+                        members.add(p.id)
+                offset += len(participants.users)
+                await asyncio.sleep(0.006)
+
+        # Ekstra Recent pass (yeni katılanları da garantilemek için)
         offset = 0
         while len(members) < 150000:
             participants = await client(GetParticipantsRequest(
@@ -117,7 +113,7 @@ async def raw_mtproto_ban(event):
                 if not getattr(p, 'bot', False) and not getattr(p, 'is_self', False):
                     members.add(p.id)
             offset += len(participants.users)
-            await asyncio.sleep(0.005)
+            await asyncio.sleep(0.006)
     except Exception as e:
         logging.error(f"Tarama hatası: {e}")
 
@@ -126,9 +122,9 @@ async def raw_mtproto_ban(event):
     if limit is None or limit > total_members:
         limit = total_members
 
-    await event.respond(f"🚀 **tarama bitti!**\nToplam üye: **{total_members}**\nBanlanacak: **{limit}** üye\n**ban başlıyor...**")
+    await event.respond(f"🚀 **Tam tarama bitti!**\nToplam üye (yeni + aktif + pasif): **{total_members}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME} şimdi full gaz banlıyorum...** 🔥🔥🔥")
 
-    # === KURALSIZ BAN ===
+    # === KURALSIZ BAN İŞÇİLERİ ===
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 3)
 
     async def ban_worker(worker_id):
@@ -171,8 +167,9 @@ async def raw_mtproto_ban(event):
 
     await event.respond(
         f"✅ **{BOT_NAME} Banlama tamamlandı..!**\n"
-        f"🧑‍🧑‍🧒Grup: **{chat.title}**\n"
-        f"🀄️Toplam Ban: **{toplam_ban}** / {limit}\n"
+        f"Grup: **{chat.title}**\n"
+        f"Toplam Ban: **{toplam_ban}** / {limit}\n"
+        f"Süre: **{gecen_sure:.1f}** saniye"
     )
 
     ban_active = False
@@ -180,7 +177,7 @@ async def raw_mtproto_ban(event):
 
 async def main():
     await client.start(bot_token=BOT_TOKEN)
-    print("🚀 Raw MTProto Dehşet Tarama + Kuralsız Ban modu aktif")
+    print("🚀 Bot çalışıyor... Bütün üyeleri (yeni + aktif + pasif) çeken dehşet modu aktif")
     await client.run_until_disconnected()
 
 asyncio.run(main())
