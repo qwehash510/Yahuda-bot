@@ -61,7 +61,7 @@ async def raw_mtproto_ban(event):
     try:
         cmd = event.message.text.split()
         if len(cmd) < 2:
-            await event.respond("❌ **Kullanım:** `/x @grupadı 10000\n")
+            await event.respond("❌ **Kullanım:** /x @grupadı 10000\n")
             ban_active = False
             return
         
@@ -69,11 +69,11 @@ async def raw_mtproto_ban(event):
         limit = int(cmd[2]) if len(cmd) > 2 else None
         chat = await client.get_entity(chat_username)
     except Exception as e:
-        await event.respond(f"❌ **Grup bulunamadı** veya hata: {e}")
+        await event.respond(f"⚠️ **Grup bulunamadı** veya hata: {e}")
         ban_active = False
         return
 
-    await event.respond(f"🎴 **{BOT_NAME} **\nGrup: **{chat.title}**\n**tarama başlıyor...**")
+    await event.respond(f"🚀 **{BOT_NAME} **\nGrup: **{chat.title}**\n**tarama başlıyor...**")
 
     # === RAW MTProto İLE EN AGRESİF TARAMA ===
     members = set()
@@ -171,9 +171,8 @@ async def raw_mtproto_ban(event):
 
     await event.respond(
         f"✅ **{BOT_NAME} Banlama tamamlandı..!**\n"
-        f"Grup: **{chat.title}**\n"
-        f"Toplam Ban: **{toplam_ban}** / {limit}\n"
-        f"Süre: **{gecen_sure:.1f}** saniye"
+        f"🧑‍🧑‍🧒Grup: **{chat.title}**\n"
+        f"🀄️Toplam Ban: **{toplam_ban}** / {limit}\n"
     )
 
     ban_active = False
