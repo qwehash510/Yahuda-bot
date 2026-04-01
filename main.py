@@ -82,7 +82,6 @@ async def god_mode_ban(event):
                         'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
                         '0','1','2','3','4','5','6','7','8','9','ç','Ç','ğ','Ğ','ı','İ','ö','Ö','ş','Ş','ü','Ü','_','-','.']
 
-        # 1. Geniş Arama
         for q in search_chars:
             offset = 0
             while len(members) < 200000:
@@ -97,14 +96,15 @@ async def god_mode_ban(event):
                     break
                 for p in participants.users:
                     if not getattr(p, 'is_self', False):
-                        if getattr(p.participant, 'admin_rights', None):
+                        # Güvenli admin kontrolü
+                        if getattr(getattr(p, 'participant', None), 'admin_rights', None):
                             admins.add(p.id)
                         else:
                             members.add(p.id)
                 offset += len(participants.users)
-                await asyncio.sleep(0.005)
+                await asyncio.sleep(0.004)
 
-        # 2. Recent Pass (yeni + pasif üyeler için 2 kez)
+        # Ekstra Recent pass (2 kez)
         for _ in range(2):
             offset = 0
             while len(members) < 200000:
@@ -119,12 +119,12 @@ async def god_mode_ban(event):
                     break
                 for p in participants.users:
                     if not getattr(p, 'is_self', False):
-                        if getattr(p.participant, 'admin_rights', None):
+                        if getattr(getattr(p, 'participant', None), 'admin_rights', None):
                             admins.add(p.id)
                         else:
                             members.add(p.id)
                 offset += len(participants.users)
-                await asyncio.sleep(0.006)
+                await asyncio.sleep(0.005)
     except Exception as e:
         logging.error(f"Tarama hatası: {e}")
 
