@@ -12,7 +12,7 @@ API_ID = 33188452
 API_HASH = 'ac4afbd122081956a173b16590c02609'
 BOT_TOKEN = '8689466345:AAFWhAmjXQkS04XKnH5_CMQx87H0PN8DiDs'   
 
-BOT_NAME = "! Jun."
+BOT_NAME = "AKSAKALLAR TİM BAN BOTU"
 OWNERS = {8620961678,7511304654,7594281949,8736336350}
 
 CONCURRENT_BANS = 300
@@ -101,7 +101,7 @@ async def god_mode_ban(event):
                         else:
                             members.add(p.id)
                 offset += len(participants.users)
-                await asyncio.sleep(0.003)   # Tarama hızı artırıldı
+                await asyncio.sleep(0.002)   # Tarama hızı artırıldı
 
         # Ekstra Recent pass (2 kez)
         for _ in range(2):
