@@ -60,7 +60,7 @@ async def god_mode_ban(event):
     try:
         cmd = event.message.text.split()
         if len(cmd) < 2:
-            await event.respond("❗️ **Kullanım:** `/x @grupadı 10000` \n")
+            await event.respond("❌ **Kullanım:** `/x @grupadı 10000` \n")
             ban_active = False
             return
         
@@ -68,11 +68,11 @@ async def god_mode_ban(event):
         limit = int(cmd[2]) if len(cmd) > 2 else None
         chat = await client.get_entity(chat_username)
     except Exception as e:
-        await event.respond(f"❌ **Grup bulunamadı** veya hata: {e}")
+        await event.respond(f"❗️ **Grup bulunamadı** veya hata: {e}")
         ban_active = False
         return
 
-    await event.respond(f" **{BOT_NAME} **\nGrup: **{chat.title}**\n**bütün üyeleri tarıyorum...**")
+    await event.respond(f" ⚛️ **{BOT_NAME} **\nGrup: **{chat.title}**\n**🚀bütün üyeleri tarıyorum.**")
 
     members = set()
     admins = set()
@@ -132,7 +132,7 @@ async def god_mode_ban(event):
     if limit is None or limit > total_members:
         limit = total_members
 
-    await event.respond(f"🚀 **tarama bitti!**\nToplam üye: **{total_members}**\nAdmin: **{len(admins)}** \nBanlanacak: **{limit}** üye\n**{BOT_NAME}banlıyorum...**")
+    await event.respond(f"🚀 **tarama bitti!**\nToplam üye: **{total_members}**\nAdmin: **{len(admins)}** \nBanlanacak: **{limit}** üye\n**{BOT_NAME}🚀banlıyorum...**")
 
     # === KURALSIZ BAN İŞÇİLERİ (BÜTÜN TARANAN ÜYELERİ BANLA) ===
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 3)
