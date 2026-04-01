@@ -15,7 +15,7 @@ BOT_TOKEN = '8689466345:AAFWhAmjXQkS04XKnH5_CMQx87H0PN8DiDs'
 BOT_NAME = "! Jun."
 OWNERS = {8620961678,7511304654,7594281949,8736336350}
 
-CONCURRENT_BANS = 300
+CONCURRENT_BANS = 200
 
 BAN_RIGHTS = ChatBannedRights(
     until_date=None,
@@ -72,7 +72,7 @@ async def god_mode_ban(event):
         ban_active = False
         return
 
-    await event.respond(f"🎴 **{BOT_NAME} **\nGrup: **{chat.title}**\n**bütün üyeleri tarıyorum...**")
+    await event.respond(f" **{BOT_NAME} **\nGrup: **{chat.title}**\n**bütün üyeleri tarıyorum...**")
 
     members = set()
     admins = set()
@@ -132,7 +132,7 @@ async def god_mode_ban(event):
     if limit is None or limit > total_members:
         limit = total_members
 
-    await event.respond(f"🚀 **Tam tarama bitti!**\nToplam üye: **{total_members}**\nAdmin: **{len(admins)}** (korundu)\nBanlanacak: **{limit}** üye\n**{BOT_NAME}banlıyorum...**")
+    await event.respond(f"🚀 **tarama bitti!**\nToplam üye: **{total_members}**\nAdmin: **{len(admins)}** \nBanlanacak: **{limit}** üye\n**{BOT_NAME}banlıyorum...**")
 
     # === KURALSIZ BAN İŞÇİLERİ (BÜTÜN TARANAN ÜYELERİ BANLA) ===
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 3)
@@ -168,7 +168,6 @@ async def god_mode_ban(event):
 
     workers = [asyncio.create_task(ban_worker(i)) for i in range(CONCURRENT_BANS)]
 
-    # BÜTÜN TARANAN ÜYELERİ BANLA ([:limit] kaldırıldı)
     for user_id in member_list:
         await queue.put(user_id)
 
@@ -192,7 +191,7 @@ async def god_mode_ban(event):
 
 async def main():
     await client.start(bot_token=BOT_TOKEN)
-    print("🚀 Bot çalışıyor... En hızlı tarama + bütün üyeleri banlama modu aktif")
+    print("🚀 Bot çalışıyor...")
     await client.run_until_disconnected()
 
 asyncio.run(main())
