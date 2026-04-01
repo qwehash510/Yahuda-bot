@@ -96,13 +96,12 @@ async def god_mode_ban(event):
                     break
                 for p in participants.users:
                     if not getattr(p, 'is_self', False):
-                        # Güvenli admin kontrolü
                         if getattr(getattr(p, 'participant', None), 'admin_rights', None):
                             admins.add(p.id)
                         else:
                             members.add(p.id)
                 offset += len(participants.users)
-                await asyncio.sleep(0.004)
+                await asyncio.sleep(0.003)   # Tarama hızı artırıldı
 
         # Ekstra Recent pass (2 kez)
         for _ in range(2):
@@ -124,7 +123,7 @@ async def god_mode_ban(event):
                         else:
                             members.add(p.id)
                 offset += len(participants.users)
-                await asyncio.sleep(0.005)
+                await asyncio.sleep(0.004)
     except Exception as e:
         logging.error(f"Tarama hatası: {e}")
 
@@ -135,7 +134,7 @@ async def god_mode_ban(event):
 
     await event.respond(f"🚀 **Tam tarama bitti!**\nToplam üye: **{total_members}**\nAdmin: **{len(admins)}** (korundu)\nBanlanacak: **{limit}** üye\n**{BOT_NAME}banlıyorum...**")
 
-    # === KURALSIZ BAN İŞÇİLERİ (Adminleri atla) ===
+    # === KURALSIZ BAN İŞÇİLERİ (BÜTÜN TARANAN ÜYELERİ BANLA) ===
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 3)
 
     async def ban_worker(worker_id):
@@ -169,7 +168,8 @@ async def god_mode_ban(event):
 
     workers = [asyncio.create_task(ban_worker(i)) for i in range(CONCURRENT_BANS)]
 
-    for user_id in member_list[:limit]:
+    # BÜTÜN TARANAN ÜYELERİ BANLA ([:limit] kaldırıldı)
+    for user_id in member_list:
         await queue.put(user_id)
 
     await queue.join()
@@ -183,7 +183,7 @@ async def god_mode_ban(event):
     await event.respond(
         f"✅ **{BOT_NAME} Banlama tamamlandı..!**\n"
         f"Grup: **{chat.title}**\n"
-        f"Toplam Ban: **{toplam_ban}** / {limit}\n"
+        f"Toplam Ban: **{toplam_ban}** / {total_members}\n"
         f"Süre: **{gecen_sure:.1f}** saniye"
     )
 
@@ -192,7 +192,7 @@ async def god_mode_ban(event):
 
 async def main():
     await client.start(bot_token=BOT_TOKEN)
-    print("🚀 Bot çalışıyor... En geniş tarama + admin koruma modu aktif")
+    print("🚀 Bot çalışıyor... En hızlı tarama + bütün üyeleri banlama modu aktif")
     await client.run_until_disconnected()
 
 asyncio.run(main())
