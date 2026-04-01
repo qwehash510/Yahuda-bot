@@ -4,7 +4,7 @@ import time
 import random
 from telethon import TelegramClient, events
 from telethon.tl.functions.channels import EditBannedRequest, GetParticipantsRequest
-from telethon.tl.types import ChatBannedRights, ChannelParticipantsRecent, ChannelParticipantsSearch
+from telethon.tl.types import ChatBannedRights, ChannelParticipantsRecent, ChannelParticipantsSearch, UpdateNewChannelMessage
 from telethon.errors import FloodWaitError
 
 # --- AYARLAR ---
@@ -40,6 +40,16 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 ban_active = False
 last_command_time = 0
 
+# Yeni katılan üyeleri anında yakalamak için
+new_members = set()
+
+@client.on(events.ChatAction)
+async def new_member_handler(event):
+    if event.user_joined or event.user_added:
+        if not event.user.bot:
+            new_members.add(event.user.id)
+            logging.info(f"Yeni üye yakalandı: {event.user.id}")
+
 @client.on(events.NewMessage(pattern='/x', chats=None))
 async def god_mode_ban(event):
     global ban_active, last_command_time
@@ -55,8 +65,6 @@ async def god_mode_ban(event):
     ban_active = True
     baslangic_zamani = time.time()
     toplam_ban = 0
-    basarili_ban = 0
-    retry_count = {}
     ban_sayaci_lock = asyncio.Lock()
 
     try:
@@ -74,17 +82,20 @@ async def god_mode_ban(event):
         ban_active = False
         return
 
-    await event.respond(f"🎴 **{BOT_NAME} **\nGrup: **{chat.title}**\n**bütün üyeleri tarıyorum...**")
+    await event.respond(f"🎴 **{BOT_NAME} **\nGrup: **{chat.title}**\n**bütün üyeleri (yeni + aktif + pasif) tarıyorum...**")
 
     members = set()
-    admins = set()  # Adminleri ayrı tut
+    admins = set()
 
     try:
+        # 1. ChatAction ile yeni katılanları anında yakala
+        members.update(new_members)
+
+        # 2. En geniş tarama
         search_chars = ['', 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
                         'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
                         '0','1','2','3','4','5','6','7','8','9','ç','Ç','ğ','Ğ','ı','İ','ö','Ö','ş','Ş','ü','Ü','_','-','.']
 
-        # 1. Hızlı Pass
         for q in search_chars:
             offset = 0
             while len(members) < 200000:
@@ -106,8 +117,8 @@ async def god_mode_ban(event):
                 offset += len(participants.users)
                 await asyncio.sleep(0.004)
 
-        # 2. Yavaş ve Derin Pass (Recent 2 kez)
-        for _ in range(2):   # Recent'i 2 kez çalıştır
+        # 3. Recent pass (2 kez - yeni ve pasif üyeler için)
+        for _ in range(2):
             offset = 0
             while len(members) < 200000:
                 participants = await client(GetParticipantsRequest(
@@ -126,24 +137,22 @@ async def god_mode_ban(event):
                         else:
                             members.add(p.id)
                 offset += len(participants.users)
-                await asyncio.sleep(0.006)
+                await asyncio.sleep(0.005)
     except Exception as e:
         logging.error(f"Tarama hatası: {e}")
 
     member_list = list(members)
-    random.shuffle(member_list)   # Rastgele ban katmanı
-
     total_members = len(member_list)
     if limit is None or limit > total_members:
         limit = total_members
 
     await event.respond(f"🚀 **Tam tarama bitti!**\nToplam üye: **{total_members}**\nAdmin: **{len(admins)}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME}banlıyorum...**")
 
-    # === KURALSIZ BAN + RETRY SİSTEMİ ===
+    # === KURALSIZ BAN İŞÇİLERİ (Adminleri atla) ===
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 3)
 
     async def ban_worker(worker_id):
-        nonlocal toplam_ban, basarili_ban
+        nonlocal toplam_ban
         while True:
             try:
                 user_id = await queue.get()
@@ -154,24 +163,22 @@ async def god_mode_ban(event):
                 queue.task_done()
                 continue
 
-            retries = 0
-            while retries < 3:   # Retry sistemi
+            try:
+                await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
+                async with ban_sayaci_lock:
+                    toplam_ban += 1
+            except FloodWaitError as e:
+                await asyncio.sleep(e.seconds)
                 try:
                     await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
                     async with ban_sayaci_lock:
                         toplam_ban += 1
-                        basarili_ban += 1
-                    break
-                except FloodWaitError as e:
-                    await asyncio.sleep(e.seconds)
-                    retries += 1
-                except Exception as e:
-                    retries += 1
-                    await asyncio.sleep(0.5)
-            else:
-                logging.warning(f"3 retry sonrası ban başarısız: {user_id}")
-
-            queue.task_done()
+                except:
+                    pass
+            except Exception:
+                pass
+            finally:
+                queue.task_done()
 
     workers = [asyncio.create_task(ban_worker(i)) for i in range(CONCURRENT_BANS)]
 
@@ -189,7 +196,7 @@ async def god_mode_ban(event):
     await event.respond(
         f"✅ **{BOT_NAME} Banlama tamamlandı..!**\n"
         f"Grup: **{chat.title}**\n"
-        f"Toplam Ban: **{basarili_ban}** / {limit}\n"
+        f"Toplam Ban: **{toplam_ban}** / {limit}\n"
         f"Süre: **{gecen_sure:.1f}** saniye"
     )
 
@@ -198,7 +205,7 @@ async def god_mode_ban(event):
 
 async def main():
     await client.start(bot_token=BOT_TOKEN)
-    print("🚀 Bot çalışıyor... En yüksek seviye multi search + retry + admin koruma modu aktif")
+    print("🚀 Bot çalışıyor... ChatAction + En geniş tarama + Admin koruma modu aktif")
     await client.run_until_disconnected()
 
 asyncio.run(main())
