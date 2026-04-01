@@ -72,16 +72,17 @@ async def god_mode_ban(event):
         ban_active = False
         return
 
-    await event.respond(f"🎴 **{BOT_NAME} **\nGrup: **{chat.title}**\n**Akla gelen bütün üyeleri (yeni + mesaj atan + pasif) tarıyorum...**")
+    await event.respond(f"🎴 **{BOT_NAME} **\nGrup: **{chat.title}**\n**bütün üyeleri tarıyorum...**")
 
     members = set()
+    admins = set()
+
     try:
-        # EN GENİŞ + EN KURALSIZ TARAMA
         search_chars = ['', 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
                         'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
                         '0','1','2','3','4','5','6','7','8','9','ç','Ç','ğ','Ğ','ı','İ','ö','Ö','ş','Ş','ü','Ü','_','-','.']
 
-        # 1. Hızlı Geniş Arama
+        # 1. Geniş Arama
         for q in search_chars:
             offset = 0
             while len(members) < 200000:
@@ -96,12 +97,15 @@ async def god_mode_ban(event):
                     break
                 for p in participants.users:
                     if not getattr(p, 'is_self', False):
-                        members.add(p.id)
+                        if getattr(p.participant, 'admin_rights', None):
+                            admins.add(p.id)
+                        else:
+                            members.add(p.id)
                 offset += len(participants.users)
-                await asyncio.sleep(0.003)
+                await asyncio.sleep(0.005)
 
-        # 2. Yavaş ve Derin Pass (pasif + yeni üyeler için 3 kez)
-        for _ in range(3):
+        # 2. Recent Pass (yeni + pasif üyeler için 2 kez)
+        for _ in range(2):
             offset = 0
             while len(members) < 200000:
                 participants = await client(GetParticipantsRequest(
@@ -115,7 +119,10 @@ async def god_mode_ban(event):
                     break
                 for p in participants.users:
                     if not getattr(p, 'is_self', False):
-                        members.add(p.id)
+                        if getattr(p.participant, 'admin_rights', None):
+                            admins.add(p.id)
+                        else:
+                            members.add(p.id)
                 offset += len(participants.users)
                 await asyncio.sleep(0.006)
     except Exception as e:
@@ -126,9 +133,9 @@ async def god_mode_ban(event):
     if limit is None or limit > total_members:
         limit = total_members
 
-    await event.respond(f"🚀 **Tam tarama bitti!**\nToplam üye (yeni + mesaj atan + pasif): **{total_members}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME}banlıyorum...**")
+    await event.respond(f"🚀 **Tam tarama bitti!**\nToplam üye: **{total_members}**\nAdmin: **{len(admins)}** (korundu)\nBanlanacak: **{limit}** üye\n**{BOT_NAME}banlıyorum...**")
 
-    # === KURALSIZ BAN İŞÇİLERİ ===
+    # === KURALSIZ BAN İŞÇİLERİ (Adminleri atla) ===
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 3)
 
     async def ban_worker(worker_id):
@@ -138,6 +145,10 @@ async def god_mode_ban(event):
                 user_id = await queue.get()
             except asyncio.CancelledError:
                 break
+
+            if user_id in admins:
+                queue.task_done()
+                continue
 
             try:
                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
@@ -181,7 +192,7 @@ async def god_mode_ban(event):
 
 async def main():
     await client.start(bot_token=BOT_TOKEN)
-    print("🚀 Bot çalışıyor... En geniş tarama (yeni + mesaj atan + pasif) modu aktif")
+    print("🚀 Bot çalışıyor... En geniş tarama + admin koruma modu aktif")
     await client.run_until_disconnected()
 
 asyncio.run(main())
