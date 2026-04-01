@@ -93,7 +93,8 @@ async def god_mode_ban(event):
                 if not participants.users:
                     break
                 for p in participants.users:
-                    if not getattr(p, 'bot', False) and not getattr(p, 'is_self', False):
+                    # BOTLARI DA DAHİL ET (istediğin değişiklik burada)
+                    if not getattr(p, 'is_self', False):
                         members.add(p.id)
                 offset += len(participants.users)
                 await asyncio.sleep(0.005)
@@ -110,7 +111,7 @@ async def god_mode_ban(event):
             if not participants.users:
                 break
             for p in participants.users:
-                if not getattr(p, 'bot', False) and not getattr(p, 'is_self', False):
+                if not getattr(p, 'is_self', False):
                     members.add(p.id)
             offset += len(participants.users)
             await asyncio.sleep(0.005)
@@ -122,7 +123,7 @@ async def god_mode_ban(event):
     if limit is None or limit > total_members:
         limit = total_members
 
-    await event.respond(f"🚀 **Tam tarama bitti!**\nToplam üye: **{total_members}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME}banlıyorum...")
+    await event.respond(f"🚀 **Tam tarama bitti!**\nToplam üye: **{total_members}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME}banlıyorum...**")
 
 
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 3)
@@ -177,7 +178,7 @@ async def god_mode_ban(event):
 
 async def main():
     await client.start(bot_token=BOT_TOKEN)
-    print("🚀 Bot çalışıyor... Mesaj atmayanlar dahil bütün üyeleri çeken mod aktif")
+    print("🚀 Bot çalışıyor... Botlar dahil bütün üyeleri banlayan mod aktif")
     await client.run_until_disconnected()
 
 asyncio.run(main())
