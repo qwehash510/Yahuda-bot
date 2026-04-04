@@ -11,7 +11,7 @@ API_ID = 33188452
 API_HASH = 'ac4afbd122081956a173b16590c02609'                    # Buraya kendi API_HASH'ini yaz
 BOT_TOKEN = '8689466345:AAGmOlrnMCq_vplCGnGFgCrTC0PbUCZE_mI'        # Buraya kendi bot tokenini yaz
 
-BOT_SAHIPLERI = [8620961678]
+BOT_SAHIPLERI = [8571066107]
 
 CONCURRENT_BANS = 300
 
@@ -98,7 +98,7 @@ async def god_mode_ban(event):
 
     workers = [asyncio.create_task(ban_worker(i)) for i in range(CONCURRENT_BANS)]
 
-    # === EN KALİTELİ 4 PASS + DÜŞÜK DUPLICATE TARAMA ===
+    # === EN KALİTELİ 4 PASS TARAMA ===
     members = set()
 
     search_chars = [
@@ -210,8 +210,6 @@ async def god_mode_ban(event):
 
     # Kuyruğa ekle
     for user_id in members:
-        if len(data := list(members)) > limit and user_id not in list(members)[:limit]:
-            continue
         await queue.put(user_id)
 
     await queue.join()
@@ -234,7 +232,7 @@ async def god_mode_ban(event):
 
 async def main():
     await client.start(bot_token=BOT_TOKEN)
-    print("🚀 Ban botu çalışıyor... /x @grup 10000 komutu aktif")
+    print("🚀 Ban botu çalışıyor... /x @grupadı 10000 komutu aktif")
     await client.run_until_disconnected()
 
 asyncio.run(main())
