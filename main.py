@@ -11,7 +11,7 @@ API_ID = 33188452
 API_HASH = 'ac4afbd122081956a173b16590c02609'                    # Buraya kendi API_HASH'ini yaz
 BOT_TOKEN = '8689466345:AAGmOlrnMCq_vplCGnGFgCrTC0PbUCZE_mI'        # Buraya kendi bot tokenini yaz
 
-BOT_SAHIPLERI = [8571066107]
+BOT_SAHIPLERI = [8620961678]
 
 CONCURRENT_BANS = 300
 
