@@ -8,7 +8,7 @@ from telethon.errors import FloodWaitError
 
 # --- AYARLAR ---
 API_ID = 33188452
-API_HASH = ''                    # Buraya kendi API_HASH'ini yaz
+API_HASH = 'ac4afbd122081956a173b16590c02609'                    # Buraya kendi API_HASH'ini yaz
 BOT_TOKEN = '8689466345:AAGmOlrnMCq_vplCGnGFgCrTC0PbUCZE_mI'        # Buraya kendi bot tokenini yaz
 
 BOT_SAHIPLERI = [8620961678]
@@ -37,16 +37,7 @@ client.flood_sleep_threshold = 0
 logging.basicConfig(level=logging.ERROR)
 ban_active = False
 
-@client.on(events.NewMessage(pattern='/start'))
-async def start_handler(event):
-    if event.sender_id in BOT_SAHIPLERI:
-        await event.respond(
-            "Avustralyakrallik Sikici Ban Botu\n"
-            "EN KALİTELİ + EN TAM TARAMA MODU\n"
-            "Sahibim @xDeoddorant & @vesvese."
-        )
-
-@client.on(events.NewMessage(pattern='/sik'))
+@client.on(events.NewMessage(pattern='/x'))
 async def god_mode_ban(event):
     global ban_active
     if event.sender_id not in BOT_SAHIPLERI:
@@ -61,14 +52,25 @@ async def god_mode_ban(event):
     ban_sayaci_lock = asyncio.Lock()
 
     try:
-        chat = await event.get_chat()
-    except:
-        await event.respond("❌ Grup alınamadı.")
+        cmd = event.message.text.split()
+        if len(cmd) < 2:
+            await event.respond("❗️ Kullanım: `/x @grupadı 10000`")
+            ban_active = False
+            return
+
+        chat_username = cmd[1]
+        limit = int(cmd[2]) if len(cmd) > 2 else None
+        chat = await client.get_entity(chat_username)
+    except Exception as e:
+        await event.respond(f"❌ Grup alınamadı: {e}")
         ban_active = False
         return
 
+    await event.respond(f"🔍 **Tarama başlatıldı...**\nGrup: **{chat.title}**\nTüm üyeler taranıyor...")
+
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 4)
 
+    # Ban işçisi
     async def ban_worker(worker_id):
         nonlocal toplam_ban
         while True:
@@ -96,17 +98,24 @@ async def god_mode_ban(event):
 
     workers = [asyncio.create_task(ban_worker(i)) for i in range(CONCURRENT_BANS)]
 
-    # === EN KALİTELİ + EN TAM TARAMA ===
+    # === EN KALİTELİ 4 PASS + DÜŞÜK DUPLICATE TARAMA ===
     members = set()
-    try:
-        search_chars = ['', 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
-                        'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
-                        '0','1','2','3','4','5','6','7','8','9','ç','Ç','ğ','Ğ','ı','İ','ö','Ö','ş','Ş','ü','Ü','_','-','.']
 
-        # Katman 1: Geniş Arama (isim bazlı)
-        for q in search_chars:
-            offset = 0
-            while len(members) < 400000:
+    search_chars = [
+        '', 
+        *list('abcdefghijklmnopqrstuvwxyz'),
+        *list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'),
+        *list('0123456789'),
+        'ç','Ç','ğ','Ğ','ı','İ','ö','Ö','ş','Ş','ü','Ü','_','-','.'
+    ]
+
+    async def scan_search(q):
+        local_members = set()
+        offset = 0
+        last_count = 0
+
+        while offset < 350000:
+            try:
                 participants = await client(GetParticipantsRequest(
                     channel=chat,
                     filter=ChannelParticipantsSearch(q),
@@ -114,18 +123,52 @@ async def god_mode_ban(event):
                     limit=200,
                     hash=0
                 ))
-                if not participants.users:
-                    break
-                for p in participants.users:
-                    if not getattr(p, 'is_self', False):
-                        members.add(p.id)
-                offset += len(participants.users)
-                await asyncio.sleep(0.003)
+            except FloodWaitError as e:
+                await asyncio.sleep(e.seconds)
+                continue
+            except:
+                break
 
-        # Katman 2: Recent Pass (pasif + yeni üyeler için) - 4 kez
-        for _ in range(4):
-            offset = 0
-            while len(members) < 400000:
+            if not participants.users:
+                break
+
+            for p in participants.users:
+                if not getattr(p, 'is_self', False):
+                    local_members.add(p.id)
+
+            current_count = len(participants.users)
+            offset += current_count
+
+            if current_count < 120 or current_count == last_count:
+                break
+
+            last_count = current_count
+            await asyncio.sleep(0.002)
+
+        return local_members
+
+    # 4 Pass Paralel Tarama
+    tasks = []
+    for q in search_chars:
+        tasks.append(asyncio.create_task(scan_search(q)))
+
+    vowels = ['a','e','i','o','u','A','E','I','O','U']
+    for _ in range(3):
+        for q in vowels:
+            tasks.append(asyncio.create_task(scan_search(q)))
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    for res in results:
+        if isinstance(res, set):
+            members.update(res)
+
+    # Recent TARAMA (4 Pass)
+    for _ in range(4):
+        offset = 0
+        last_count = 0
+        while offset < 350000:
+            try:
                 participants = await client(GetParticipantsRequest(
                     channel=chat,
                     filter=ChannelParticipantsRecent(),
@@ -133,38 +176,42 @@ async def god_mode_ban(event):
                     limit=200,
                     hash=0
                 ))
-                if not participants.users:
-                    break
-                for p in participants.users:
-                    if not getattr(p, 'is_self', False):
-                        members.add(p.id)
-                offset += len(participants.users)
-                await asyncio.sleep(0.004)
+            except FloodWaitError as e:
+                await asyncio.sleep(e.seconds)
+                continue
+            except:
+                break
 
-        # Katman 3: Ekstra offset reset ile tekrar arama (kaçan üyeleri yakalamak için)
-        for q in ['', 'a', 'e', 'i', 'o', 'u']:
-            offset = 0
-            while len(members) < 400000:
-                participants = await client(GetParticipantsRequest(
-                    channel=chat,
-                    filter=ChannelParticipantsSearch(q),
-                    offset=offset,
-                    limit=200,
-                    hash=0
-                ))
-                if not participants.users:
-                    break
-                for p in participants.users:
-                    if not getattr(p, 'is_self', False):
-                        members.add(p.id)
-                offset += len(participants.users)
-                await asyncio.sleep(0.003)
+            if not participants.users:
+                break
 
-    except Exception as e:
-        logging.error(f"Tarama hatası: {e}")
+            for p in participants.users:
+                if not getattr(p, 'is_self', False):
+                    members.add(p.id)
 
-    # Kuyruğa tüm bulunan üyeleri ekle
+            current_count = len(participants.users)
+            offset += current_count
+
+            if current_count < 100 or current_count == last_count:
+                break
+
+            last_count = current_count
+            await asyncio.sleep(0.003)
+
+    # Kendi kendini banlamayı önle
+    if event.sender_id in members:
+        members.remove(event.sender_id)
+
+    total_members = len(members)
+    if limit is None or limit > total_members:
+        limit = total_members
+
+    await event.respond(f"✅ Tarama tamamlandı.\nToplam bulunan üye: **{total_members}**\nBanlanacak: **{limit}** üye\nBan başlıyor...")
+
+    # Kuyruğa ekle
     for user_id in members:
+        if len(data := list(members)) > limit and user_id not in list(members)[:limit]:
+            continue
         await queue.put(user_id)
 
     await queue.join()
@@ -176,10 +223,10 @@ async def god_mode_ban(event):
     gecen_sure = time.time() - baslangic_zamani
 
     await event.respond(
-        f"✅ İşlem Tamamlandı (EN KALİTELİ + EN TAM TARAMA)\n"
-        f"Süre: {gecen_sure:.1f} saniye.\n"
-        f"Tarama: {len(members)} üye\n"
-        f"Toplam Ban: {toplam_ban}"
+        f"✅ **Banlama tamamlandı.**\n"
+        f"Grup: **{chat.title}**\n"
+        f"Toplam Ban: **{toplam_ban}** / {limit}\n"
+        f"Süre: **{gecen_sure:.1f}** saniye"
     )
 
     ban_active = False
@@ -187,7 +234,7 @@ async def god_mode_ban(event):
 
 async def main():
     await client.start(bot_token=BOT_TOKEN)
-    print("🚀 Avustralyakrallik Sikici Ban Botu (EN KALİTELİ + EN TAM TARAMA) çalışıyor...")
+    print("🚀 Ban botu çalışıyor... /x @grup 10000 komutu aktif")
     await client.run_until_disconnected()
 
 asyncio.run(main())
