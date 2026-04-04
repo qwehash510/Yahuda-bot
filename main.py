@@ -9,13 +9,14 @@ from telethon.errors import FloodWaitError
 # --- AYARLAR ---
 API_ID = 33188452
 API_HASH = 'ac4afbd122081956a173b16590c02609'
-BOT_TOKEN = '8689466345:AAGmOlrnMCq_vplCGnGFgCrTC0PbUCZE_mI'   # Tamamla
+BOT_TOKEN = '8689466345:AAGmOlrnMCq_vplCGnGFgCrTC0PbUCZE_mI'   # Burayı kendi bot token'ınla tamamla
 
-BOT_SAHIPLERI = [8620961678]
 BOT_NAME = "Jun"
 
-CONCURRENT_BANS = 300   # İstediğin kadar yükselt (200-300 bile dene, yıksın geçsin)
+# AYNI ANDA ÇALIŞACAK YASAKLAMA İŞÇİ SAYISI (ULTRA MAX İÇİN 100)
+CONCURRENT_BANS = 300
 
+# Yasaklama hakları (tüm yetkiler kısıtlanır)
 BAN_RIGHTS = ChatBannedRights(
     until_date=None,
     view_messages=True,
@@ -32,40 +33,40 @@ BAN_RIGHTS = ChatBannedRights(
     pin_messages=True
 )
 
+# İstemci oluştur
 client = TelegramClient('jun_max_session', API_ID, API_HASH)
+
+# Flood korumasını tamamen kaldır (riskli, ultra hız için)
 client.flood_sleep_threshold = 0
 
 logging.basicConfig(level=logging.ERROR)
 ban_active = False
 
-@client.on(events.NewMessage(pattern='/start', chats=None))
-async def start_handler(event):
-    if event.sender_id in BOT_SAHIPLERI and event.is_private:
-        await event.respond(
-            f"{BOT_NAME} – Full Sikici Ban Botu\n"
-            "Sadece özelden çalışır.\n"
-            "Kullanım: /sik @grupadi"
-        )
-
-@client.on(events.NewMessage(pattern='/sik', chats=None))
+@client.on(events.NewMessage(pattern='/x', chats=None))
 async def god_mode_ban(event):
     global ban_active
-    if event.sender_id not in BOT_SAHIPLERI or not event.is_private:
+    if not event.is_private:
         return
 
     if ban_active:
-        await event.respond("⏳ Zaten ban işlemi devam ediyor.")
+        await event.respond("⏳ **Zaten bir ban işlemi devam ediyor**, lütfen bekleyin.")
         return
 
     try:
         cmd = event.message.text.split()
         if len(cmd) < 2:
-            await event.respond("❌ Kullanım: `/sik @grupadi`")
+            await event.respond("❌ **Kullanım:** `/x @grupadı 10000`\nSayı girmezsen **tüm üyeleri** banlar.")
             return
+        
         chat_username = cmd[1]
+        limit = int(cmd[2]) if len(cmd) > 2 else None
+        
         chat = await client.get_entity(chat_username)
+    except ValueError:
+        await event.respond("❌ **Limit sayı olmalı!** Örnek: `/x @grupadı 10000`")
+        return
     except Exception as e:
-        await event.respond(f"❌ Grup bulunamadı: {e}")
+        await event.respond(f"❌ **Grup bulunamadı** veya hata: {e}")
         return
 
     ban_active = True
@@ -73,22 +74,31 @@ async def god_mode_ban(event):
     toplam_ban = 0
     ban_sayaci_lock = asyncio.Lock()
 
-    await event.respond(f"🔍 {BOT_NAME} grubu **tamamen** tarıyor: **{chat.title}**\nBu biraz zaman alabilir...")
+    await event.respond(f"🔍 **{BOT_NAME} grubu tarıyor...**\nGrup: **{chat.title}**\nLütfen bekleyin...")
 
-    # === 1. ADIM: BÜTÜN ÜYELERİ TARA ===
+    # === ÖNCE TAM TARAMA ===
     members = []
     try:
-        async for user in client.iter_participants(chat, aggressive=True):
-            if not user.bot and not user.is_self:
+        async for user in client.iter_participants(chat):
+            if not user.bot and not user.is_self and not user.participant.admin_rights and not user.participant.banned_rights:
                 members.append(user.id)
-        await event.respond(f"✅ Tarama bitti! **{len(members)}** üye bulundu.\nŞimdi hepsini banlıyorum...")
+        
+        total_members = len(members)
+        if limit is None:
+            limit = total_members
+        else:
+            limit = min(limit, total_members)
+        
+        await event.respond(f"🚀 **Tarama tamamlandı!**\nToplam normal üye: **{total_members}**\nBanlanacak: **{limit}** üye\n**{BOT_NAME} şimdi banlamaya başlıyor...**")
     except Exception as e:
-        await event.respond(f"⚠ Tarama hatası: {e} → Yine de devam ediyorum.")
+        await event.respond(f"⚠ **Tarama hatası:** {e}\nDevam ediyorum...")
         members = []
+        limit = 0
 
-    # === 2. ADIM: BAN İŞÇİLERİ BAŞLAT ===
+    # Kuyruk
     queue = asyncio.Queue(maxsize=CONCURRENT_BANS * 2)
 
+    # İşçi
     async def ban_worker(worker_id):
         nonlocal toplam_ban
         while True:
@@ -101,10 +111,10 @@ async def god_mode_ban(event):
                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
                 async with ban_sayaci_lock:
                     toplam_ban += 1
-                    if toplam_ban % 100 == 0:
-                        await event.respond(f"🔥 {BOT_NAME} devam: **{toplam_ban}** üye banlandı...")
+                    if toplam_ban % 50 == 0:
+                        await event.respond(f"🔥 **{BOT_NAME} devam ediyor...**\nBanlanan: **{toplam_ban}** / {limit}")
             except FloodWaitError as e:
-                logging.warning(f"FloodWait {e.seconds}s → bekleniyor")
+                logging.warning(f"FloodWait {e.seconds} saniye")
                 await asyncio.sleep(e.seconds)
                 try:
                     await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
@@ -117,10 +127,11 @@ async def god_mode_ban(event):
             finally:
                 queue.task_done()
 
+    # İşçileri başlat
     workers = [asyncio.create_task(ban_worker(i)) for i in range(CONCURRENT_BANS)]
 
-    # Taranan tüm üyeleri kuyruğa at
-    for user_id in members:
+    # İlk 'limit' kadar üyeyi kuyruğa ekle
+    for user_id in members[:limit]:
         await queue.put(user_id)
 
     await queue.join()
@@ -131,16 +142,16 @@ async def god_mode_ban(event):
 
     gecen_sure = time.time() - baslangic_zamani
     await event.respond(
-        f"✅ {BOT_NAME} YIKIM TAMAMLANDI!\n"
+        f"✅ **{BOT_NAME} YIKIM TAMAMLANDI!**\n"
         f"Grup: **{chat.title}**\n"
-        f"Toplam banlanan: **{toplam_ban}**\n"
-        f"Süre: {gecen_sure:.1f} saniye\n"
-        f"Bütün üyeler hedeflendi."
+        f"Toplam Ban: **{toplam_ban}** / {limit}\n"
+        f"Süre: **{gecen_sure:.1f}** saniye\n"
+        f"**Kuralsız mod** ile çalıştı."
     )
 
     ban_active = False
 
 
-print(f"🚀 {BOT_NAME} ULTRA MAX HIZ ile başlatılıyor...")
+print(f"🚀 **{BOT_NAME}** ULTRA MAX HIZ ile başlatılıyor (ÇOK RİSKLİ)...")
 client.start(bot_token=BOT_TOKEN)
 client.run_until_disconnected()
