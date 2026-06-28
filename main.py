@@ -9,10 +9,10 @@ from telethon.errors import FloodWaitError
 # --- AYARLAR ---
 API_ID = 33188452
 API_HASH = 'ac4afbd122081956a173b16590c02609'
-BOT_TOKEN = '8677463032:AAFPyqqEh3lya4E9_kNlqWYE_XODLq_pIIw'   
+BOT_TOKEN = '8964637255:AAE7nS_m3G1Xe3YLVmhQQplKw5ygzEsgq2U'   
 
-BOT_NAME = "ÂrestaXL '"
-BOT_SAHIPLERI = [8616625872]   
+BOT_NAME = "Aspova ban botu"
+BOT_SAHIPLERI = [157828443]   
 
 CONCURRENT_BANS = 300
 
